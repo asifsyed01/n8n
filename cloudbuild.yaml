@@ -7,13 +7,17 @@ steps:
       - 'gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
       - '-t'
       - 'gcr.io/$PROJECT_ID/n8n:latest'
+      - '--build-arg'
+      - 'NODE_ENV=production'
       - '../../..'
+    timeout: 1200s
     
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
       - 'gcr.io/$PROJECT_ID/n8n'
+    timeout: 600s
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
@@ -22,14 +26,40 @@ steps:
       - 'n8n'
       - '--image=gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
       - '--platform=managed'
-      - '--region=europe-west1'
+      
+      # FREE TIER REGION - MANDATORY
+      - '--region=us-central1'
+      
       - '--port=5678'
+      
+      # 2 GiB - FREE for up to 600k requests/month
       - '--memory=2Gi'
-      - '--cpu=1'
+      
+      # CPU throttling - critical for free tier
+      - '--cpu-throttling'
+      
+      # Scale to zero when idle - critical for free tier
+      - '--min-instances=0'
+      - '--max-instances=3'
+      
+      - '--concurrency=80'
+      - '--timeout=300'
+      
+      # Essential n8n environment variables
+      - '--set-env-vars=N8N_PORT=5678'
+      - '--set-env-vars=N8N_PROTOCOL=https'
+      - '--set-env-vars=NODE_ENV=production'
+      - '--set-env-vars=N8N_LOG_LEVEL=info'
+      
       - '--allow-unauthenticated'
+    timeout: 600s
 
 images:
   - 'gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/n8n:latest'
 
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  
 timeout: 1800s
