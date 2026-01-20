@@ -1,19 +1,28 @@
 steps:
-  # Step 1: Build the Docker image from n8n's subdirectory
+  # Pull official n8n image
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'docker/images/n8n'  # THIS LINE WAS MISSING!
     args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/n8n:latest'
-      - '--build-arg'
-      - 'NODE_ENV=production'
-      - '../../..'
-    timeout: 1200s
+      - 'pull'
+      - 'docker.n8n.io/n8nio/n8n:latest'
+    timeout: 600s
     
-  # Step 2: Push both image tags to Google Container Registry
+  # Tag with commit SHA
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'docker.n8n.io/n8nio/n8n:latest'
+      - 'gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
+    timeout: 120s
+    
+  # Tag as latest
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'docker.n8n.io/n8nio/n8n:latest'
+      - 'gcr.io/$PROJECT_ID/n8n:latest'
+    timeout: 120s
+
+  # Push to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
@@ -21,7 +30,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/n8n'
     timeout: 600s
 
-  # Step 3: Deploy to Cloud Run - FREE TIER OPTIMIZED
+  # Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
@@ -29,44 +38,27 @@ steps:
       - 'n8n'
       - '--image=gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
       - '--platform=managed'
-      
-      # FREE TIER REGION - MANDATORY
       - '--region=us-central1'
-      
       - '--port=5678'
-      
-      # 2 GiB - FREE for up to 600k requests/month
       - '--memory=2Gi'
-      
-      # CPU throttling - critical for free tier
       - '--cpu-throttling'
-      
-      # Scale to zero when idle - critical for free tier
       - '--min-instances=0'
       - '--max-instances=3'
-      
       - '--concurrency=80'
       - '--timeout=300'
-      
-      # Essential n8n environment variables
       - '--set-env-vars=N8N_PORT=5678'
       - '--set-env-vars=N8N_PROTOCOL=https'
       - '--set-env-vars=NODE_ENV=production'
       - '--set-env-vars=N8N_LOG_LEVEL=info'
-      
       - '--allow-unauthenticated'
     timeout: 600s
 
-# Images to be pushed to registry
 images:
   - 'gcr.io/$PROJECT_ID/n8n:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/n8n:latest'
 
-# Global build settings
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
   
-# Total build timeout
 timeout: 1800s
-
